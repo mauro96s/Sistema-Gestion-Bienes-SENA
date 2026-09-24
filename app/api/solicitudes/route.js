@@ -1,4 +1,4 @@
-import { query } from '@/lib/db';
+import { query, getClient } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 /**
@@ -21,7 +21,7 @@ export async function GET(request) {
         s.motivo,
         s.estado,
         s.observaciones,
-        p.nombres || ' ' || p.apellidos as solicitante_nombre,
+        CONCAT(p.nombres, ' ', p.apellidos) as solicitante_nombre,
         p.documento as solicitante_documento,
         sed.nombre as sede_nombre,
         (
@@ -30,7 +30,7 @@ export async function GET(request) {
           WHERE fs.solicitud_id = s.id
         ) as firmas_completadas,
         (
-          SELECT DISTINCT pc.nombres || ' ' || pc.apellidos
+          SELECT DISTINCT CONCAT(pc.nombres, ' ', pc.apellidos)
           FROM detalle_solicitud ds
           JOIN asignaciones a ON ds.asignacion_id = a.id
           JOIN persona pc ON a.doc_persona = pc.documento
@@ -49,7 +49,16 @@ export async function GET(request) {
     if (rol === 'usuario' && documento) {
       // Usuario ve solo sus solicitudes
       params.push(documento);
-      sqlQuery += ` AND s.doc_persona = $${params.length}`;
+      sqlQuery += ` AND s.doc_persona = ?`;
+
+    } else if (rol === 'cuentadante' && documento) {
+      // Cuentadante ve solicitudes de bienes bajo su cargo
+      params.push(documento);
+      sqlQuery += ` AND EXISTS (
+        SELECT 1 FROM detalle_solicitud ds
+        JOIN asignaciones a ON ds.asignacion_id = a.id
+        WHERE ds.solicitud_id = s.id AND a.doc_persona = ?
+      )`;
 
     } else if (rol === 'vigilante' || rol === 'coordinador') {
       if (!documento) {
@@ -61,12 +70,12 @@ export async function GET(request) {
           SELECT rp.sede_id 
           FROM rol_persona rp
           JOIN rol r ON rp.rol_id = r.id
-          WHERE rp.doc_persona = $1 AND r.nombre = $2
+          WHERE rp.doc_persona = ? AND r.nombre = ?
         `, [documento, rol]);
 
         if (sedeResult.rows.length > 0 && sedeResult.rows[0].sede_id) {
           params.push(sedeResult.rows[0].sede_id);
-          sqlQuery += ` AND s.sede_id = $${params.length}`;
+          sqlQuery += ` AND s.sede_id = ?`;
         } else {
           // Si no tiene sede asignada (o error), forzamos que no vea nada para seguridad
           sqlQuery += ` AND 1=0`;
@@ -99,7 +108,7 @@ export async function GET(request) {
  * Recibe un array de bienes y los agrupa automáticamente
  */
 export async function POST(request) {
-  const client = await query('BEGIN');
+  let client;
 
   try {
     const body = await request.json();
@@ -116,7 +125,6 @@ export async function POST(request) {
 
     // Validaciones
     if (!doc_persona || !sede_id || !fecha_ini_prestamo || !fecha_fin_prestamo || !destino || !motivo) {
-      await query('ROLLBACK');
       return NextResponse.json(
         { success: false, error: 'Faltan campos obligatorios' },
         { status: 400 }
@@ -124,32 +132,33 @@ export async function POST(request) {
     }
 
     if (!bienes || bienes.length === 0) {
-      await query('ROLLBACK');
       return NextResponse.json(
         { success: false, error: 'Debes seleccionar al menos un bien' },
         { status: 400 }
       );
     }
 
+    client = await getClient();
+    await client.query('START TRANSACTION');
+
     // Obtener información de los bienes y agrupar por cuentadante
-    const bienesInfo = await query(`
+    // En MySQL usamos placeholder ? y el array de bienes como parámetro
+    // Pero MySQL no expande automáticamente arrays en 'IN (?)', así que usamos una técnica compatible
+    const placeholders = bienes.map(() => '?').join(',');
+    const bienesInfo = await client.query(`
       SELECT 
         a.id as asignacion_id,
         a.doc_persona as cuentadante_documento,
-        p.nombres || ' ' || p.apellidos as cuentadante_nombre,
+        CONCAT(p.nombres, ' ', p.apellidos) as cuentadante_nombre,
         b.placa
       FROM asignaciones a
       JOIN persona p ON a.doc_persona = p.documento
       JOIN bienes b ON a.bien_id = b.id
-      WHERE a.id = ANY($1) AND a.bloqueado = false
-    `, [bienes]);
+      WHERE a.id IN (${placeholders}) AND a.bloqueado = false
+    `, bienes);
 
     if (bienesInfo.rows.length !== bienes.length) {
-      await query('ROLLBACK');
-      return NextResponse.json(
-        { success: false, error: 'Algunos bienes no están disponibles' },
-        { status: 400 }
-      );
+      throw new Error('Algunos bienes no están disponibles o ya están bloqueados');
     }
 
     // Agrupar por cuentadante
@@ -171,7 +180,7 @@ export async function POST(request) {
     // Crear una solicitud por cada cuentadante
     for (const [cuentadanteDoc, grupo] of Object.entries(grupos)) {
       // Crear solicitud
-      const solicitudResult = await query(`
+      const solicitudResult = await client.query(`
         INSERT INTO solicitudes (
           doc_persona,
           sede_id,
@@ -181,8 +190,7 @@ export async function POST(request) {
           motivo,
           observaciones,
           estado
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pendiente')
-        RETURNING id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente')
       `, [
         doc_persona,
         parseInt(sede_id),
@@ -193,13 +201,13 @@ export async function POST(request) {
         observaciones || null
       ]);
 
-      const solicitudId = solicitudResult.rows[0].id;
+      const solicitudId = solicitudResult.rows[0].id; // insertId mapeado en lib/db.js
 
       // Insertar detalles (bienes de esta solicitud)
       for (const bien of grupo.bienes) {
-        await query(`
+        await client.query(`
           INSERT INTO detalle_solicitud (solicitud_id, asignacion_id)
-          VALUES ($1, $2)
+          VALUES (?, ?)
         `, [solicitudId, bien.asignacion_id]);
       }
 
@@ -210,7 +218,7 @@ export async function POST(request) {
       });
     }
 
-    await query('COMMIT');
+    await client.query('COMMIT');
 
     return NextResponse.json({
       success: true,
@@ -220,11 +228,13 @@ export async function POST(request) {
     });
 
   } catch (error) {
-    await query('ROLLBACK');
+    if (client) await client.query('ROLLBACK');
     console.error('Error al crear solicitudes:', error);
     return NextResponse.json(
-      { success: false, error: 'Error al procesar la solicitud', detail: error.message },
+      { success: false, error: error.message },
       { status: 500 }
     );
+  } finally {
+    if (client) client.release();
   }
 }

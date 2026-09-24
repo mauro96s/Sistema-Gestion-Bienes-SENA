@@ -26,10 +26,15 @@ export async function GET(request) {
         b.modelo,
         b.serial,
         b.fecha_compra,
-        (SELECT estado FROM estado_bien WHERE bien_id = b.id ORDER BY fecha_registro DESC LIMIT 1) as estado_bien,
+        COALESCE(
+          (SELECT estado FROM estado_bien WHERE bien_id = b.id ORDER BY fecha_registro DESC LIMIT 1),
+          'buen_estado'
+        ) as estado_fisico,
         a.bloqueado,
         CASE 
-          WHEN a.bloqueado = true THEN 'en_prestamo'
+          WHEN (SELECT estado FROM estado_bien WHERE bien_id = b.id ORDER BY fecha_registro DESC LIMIT 1) IN ('en_mantenimiento', 'deteriorado', 'dado_de_baja') 
+            THEN (SELECT estado FROM estado_bien WHERE bien_id = b.id ORDER BY fecha_registro DESC LIMIT 1)
+          WHEN a.bloqueado = 1 THEN 'en_prestamo'
           ELSE 'disponible'
         END as estado,
         amb.nombre as ambiente,
@@ -40,30 +45,32 @@ export async function GET(request) {
       LEFT JOIN marcas m ON b.marca_id = m.id
       LEFT JOIN ambientes amb ON a.ambiente_id = amb.id
       LEFT JOIN sedes s ON amb.sede_id = s.id
-      WHERE a.doc_persona = $1
+      WHERE a.doc_persona = ?
     `;
 
     const params = [usuarioId];
-    let paramCount = 2;
 
     // Filtro de búsqueda
     if (search) {
       sqlQuery += ` AND (
-        b.placa ILIKE $${paramCount} OR 
-        b.descripcion ILIKE $${paramCount} OR
-        b.modelo ILIKE $${paramCount} OR
-        b.serial ILIKE $${paramCount}
+        b.placa LIKE ? OR 
+        b.descripcion LIKE ? OR
+        b.modelo LIKE ? OR
+        b.serial LIKE ?
       )`;
-      params.push(`%${search}%`);
-      paramCount++;
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     // Filtro de estado
     if (estadoFilter) {
       if (estadoFilter === 'disponible') {
-        sqlQuery += ` AND a.bloqueado = false`;
+        sqlQuery += ` AND a.bloqueado = 0 AND (SELECT estado FROM estado_bien WHERE bien_id = b.id ORDER BY fecha_registro DESC LIMIT 1) = 'buen_estado'`;
       } else if (estadoFilter === 'en_prestamo') {
-        sqlQuery += ` AND a.bloqueado = true`;
+        sqlQuery += ` AND a.bloqueado = 1`;
+      } else {
+        // Otros estados físicos
+        sqlQuery += ` AND (SELECT estado FROM estado_bien WHERE bien_id = b.id ORDER BY fecha_registro DESC LIMIT 1) = ?`;
+        params.push(estadoFilter);
       }
     }
 

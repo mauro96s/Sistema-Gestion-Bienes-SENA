@@ -1,9 +1,9 @@
 /**
- * SCRIPT 1: RESET COMPLETO DE BASE DE DATOS
+ * SCRIPT 1: RESET COMPLETO DE BASE DE DATOS (MySQL)
  * 
  * Funciones:
  * - Elimina TODOS los datos de todas las tablas
- * - Reinicia los AUTO_INCREMENT (secuencias)
+ * - Reinicia los AUTO_INCREMENT
  * - Deja la base de datos completamente limpia
  * 
  * ⚠️ ADVERTENCIA: Este script elimina TODOS los datos
@@ -11,85 +11,53 @@
  * Uso: node scripts/1-reset-database.js
  */
 
-import pkg from 'pg';
-const { Pool } = pkg;
+import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config({ path: '.env.local' });
 
-const pool = new Pool(
-    process.env.DATABASE_URL 
-      ? { connectionString: process.env.DATABASE_URL }
-      : {
-          host: process.env.DB_HOST || 'localhost',
-          port: parseInt(process.env.DB_PORT) || 5432,
-          database: process.env.DB_NAME || 'sena_bienes',
-          user: process.env.DB_USER || 'postgres',
-          password: process.env.DB_PASSWORD || '123456',
-        }
-);
+const dbConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT) || 3306,
+    database: process.env.DB_NAME || 'sena_bienes',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    multipleStatements: true // Importante para ejecutar el archivo .sql completo
+};
 
 async function resetDatabase() {
+    let connection;
     try {
-        console.log('🧹 INICIANDO RESET COMPLETO DE BASE DE DATOS...\n');
-        console.log('⚠️  ADVERTENCIA: Se eliminarán TODOS los datos\n');
-
-        // 1. Eliminar datos de todas las tablas (en orden correcto por dependencias)
-        console.log('1️⃣ Eliminando datos de todas las tablas...');
+        console.log('🧹 INICIANDO RESET Y RECONSTRUCCIÓN DE BASE DE DATOS (MySQL)...\n');
         
-        const tablesToClean = [
-            'firma_solicitud',
-            'detalle_solicitud', 
-            'solicitudes',
-            'asignaciones',
-            'estado_bien',
-            'bienes',
-            'rol_persona',
-            'persona',
-            'rol',
-            'ambientes',
-            'sedes',
-            'marcas'
-        ];
+        connection = await mysql.createConnection(dbConfig);
 
-        for (const table of tablesToClean) {
-            await pool.query(`DELETE FROM ${table}`);
-            console.log(`   ✅ Tabla ${table} limpiada`);
+        // 1. Leer el archivo de esquema
+        const schemaPath = path.join(process.cwd(), 'database_schema.sql');
+        if (!fs.existsSync(schemaPath)) {
+            throw new Error('No se encontró el archivo database_schema.sql');
         }
 
-        // 2. Reiniciar secuencias (AUTO_INCREMENT)
-        console.log('\n2️⃣ Reiniciando secuencias (AUTO_INCREMENT)...');
+        console.log('1️⃣ Ejecutando database_schema.sql...');
+        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
         
-        const sequencesToReset = [
-            'sedes_id_seq',
-            'ambientes_id_seq', 
-            'marcas_id_seq',
-            'rol_id_seq',
-            'bienes_id_seq',
-            'asignaciones_id_seq',
-            'solicitudes_id_seq',
-            'detalle_solicitud_id_seq',
-            'firma_solicitud_id_seq',
-            'estado_bien_id_seq'
+        // Ejecutar todo el SQL (DROP y CREATE de todas las tablas)
+        await connection.query(schemaSql);
+        console.log('   ✅ Esquema de base de datos recreado correctamente');
+
+        // 2. Verificar tablas
+        console.log('\n2️⃣ Verificando tablas creadas...');
+        const tablesToVerify = [
+            'firma_solicitud', 'detalle_solicitud', 'solicitudes',
+            'asignaciones', 'estado_bien', 'bienes', 'rol_persona',
+            'persona', 'rol', 'ambientes', 'sedes', 'marcas'
         ];
-
-        for (const sequence of sequencesToReset) {
-            try {
-                await pool.query(`ALTER SEQUENCE ${sequence} RESTART WITH 1`);
-                console.log(`   ✅ Secuencia ${sequence} reiniciada`);
-            } catch (error) {
-                // Algunas secuencias pueden no existir, continuar
-                console.log(`   ⚠️  Secuencia ${sequence} no encontrada (normal)`);
-            }
-        }
-
-        // 3. Verificar que todo esté limpio
-        console.log('\n3️⃣ Verificando limpieza...');
         
-        for (const table of tablesToClean) {
-            const result = await pool.query(`SELECT COUNT(*) as total FROM ${table}`);
-            const count = parseInt(result.rows[0].total);
-            console.log(`   ${table}: ${count} registros`);
+        for (const table of tablesToVerify) {
+            const [rows] = await connection.query(`SELECT COUNT(*) as total FROM ${table}`);
+            console.log(`   ${table}: ${rows[0].total} registros`);
         }
 
         console.log('\n✅ BASE DE DATOS COMPLETAMENTE LIMPIA');
@@ -98,11 +66,11 @@ async function resetDatabase() {
     } catch (error) {
         console.error('❌ Error durante el reset:', error.message);
         console.log('\n💡 Asegúrate de que:');
-        console.log('   - La base de datos esté corriendo');
+        console.log('   - MySQL esté corriendo');
+        console.log('   - La base de datos "' + dbConfig.database + '" exista');
         console.log('   - Las credenciales en .env.local sean correctas');
-        console.log('   - Tengas permisos para eliminar datos');
     } finally {
-        await pool.end();
+        if (connection) await connection.end();
     }
 }
 

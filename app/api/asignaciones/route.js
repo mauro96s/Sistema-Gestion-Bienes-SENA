@@ -26,7 +26,7 @@ export async function POST(request) {
           SELECT b.id, b.placa, b.descripcion,
                  (SELECT estado FROM estado_bien WHERE bien_id = b.id ORDER BY fecha_registro DESC LIMIT 1) as estado
           FROM bienes b
-          WHERE b.id = $1
+          WHERE b.id = ?
         `;
         const bienResult = await query(checkBienQuery, [bien_id]);
 
@@ -40,7 +40,7 @@ export async function POST(request) {
         // Verificar si ya tiene una asignación activa
         const checkAsignacionQuery = `
           SELECT id FROM asignaciones 
-          WHERE bien_id = $1 
+          WHERE bien_id = ? 
           ORDER BY fecha_asignacion DESC 
           LIMIT 1
         `;
@@ -59,8 +59,7 @@ export async function POST(request) {
         const insertAsignacionQuery = `
           INSERT INTO asignaciones (
             bien_id, doc_persona, ambiente_id, bloqueado
-          ) VALUES ($1, $2, $3, $4)
-          RETURNING *
+          ) VALUES (?, ?, ?, ?)
         `;
         
         const asignacionResult = await query(insertAsignacionQuery, [
@@ -129,7 +128,7 @@ export async function GET(request) {
         a.fecha_asignacion,
         b.placa as bien_placa,
         b.descripcion as bien_descripcion,
-        p.nombres || ' ' || p.apellidos as cuentadante_nombre,
+        CONCAT(p.nombres, ' ', p.apellidos) as cuentadante_nombre,
         amb.nombre as ambiente_nombre
       FROM asignaciones a
       LEFT JOIN bienes b ON a.bien_id = b.id
@@ -142,13 +141,13 @@ export async function GET(request) {
     let paramCount = 1;
 
     if (bien_id) {
-      sqlQuery += ` AND a.bien_id = $${paramCount}`;
+      sqlQuery += ` AND a.bien_id = ?`;
       params.push(parseInt(bien_id));
       paramCount++;
     }
 
     if (cuentadante_id) {
-      sqlQuery += ` AND a.doc_persona = $${paramCount}`;
+      sqlQuery += ` AND a.doc_persona = ?`;
       params.push(cuentadante_id);
       paramCount++;
     }

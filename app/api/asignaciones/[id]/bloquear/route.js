@@ -24,9 +24,8 @@ export async function PUT(request, { params }) {
     // Actualizar el estado de bloqueo
     const updateQuery = `
       UPDATE asignaciones 
-      SET bloqueado = $1
-      WHERE id = $2
-      RETURNING *
+      SET bloqueado = ?
+      WHERE id = ?
     `;
 
     const result = await query(updateQuery, [bloqueado, parseInt(id)]);

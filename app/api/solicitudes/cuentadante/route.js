@@ -30,7 +30,7 @@ export async function GET(request) {
         s.motivo,
         s.estado,
         s.observaciones,
-        p.nombres || ' ' || p.apellidos as solicitante_nombre,
+        CONCAT(p.nombres, ' ', p.apellidos) as solicitante_nombre,
         p.correo as solicitante_email,
         sed.nombre as sede_nombre,
         (
@@ -48,7 +48,7 @@ export async function GET(request) {
       LEFT JOIN sedes sed ON s.sede_id = sed.id
       JOIN detalle_solicitud ds ON s.id = ds.solicitud_id
       JOIN asignaciones a ON ds.asignacion_id = a.id
-      WHERE a.doc_persona = $1
+      WHERE a.doc_persona = ?
     `;
 
     // Si es pendientes, filtrar solo las que necesitan firma del cuentadante
@@ -59,15 +59,20 @@ export async function GET(request) {
           SELECT 1 FROM firma_solicitud fs
           WHERE fs.solicitud_id = s.id
             AND fs.rol_usuario = 'cuentadante'
-            AND fs.doc_persona = $1
+            AND fs.doc_persona = ?
         )
       `;
     }
     // Si es historial, mostrar todas las solicitudes que incluyen sus bienes
 
+    const params = [documento];
+    if (tipo === 'pendientes') {
+      params.push(documento);
+    }
+
     sqlQuery += ' ORDER BY s.id DESC';
 
-    const result = await query(sqlQuery, [documento]);
+    const result = await query(sqlQuery, params);
 
     return NextResponse.json({
       success: true,

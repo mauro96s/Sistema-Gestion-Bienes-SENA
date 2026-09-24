@@ -46,7 +46,7 @@ export async function POST(request) {
       SELECT r.id, r.nombre, rp.sede_id
       FROM rol r
       INNER JOIN rol_persona rp ON r.id = rp.rol_id
-      WHERE rp.doc_persona = $1 AND r.id = $2
+      WHERE rp.doc_persona = ? AND r.id = ?
     `, [decoded.documento, nuevoRolId]);
 
     if (verificacion.rows.length === 0) {
@@ -61,7 +61,7 @@ export async function POST(request) {
 
     // 5. Obtener datos de la persona
     const personaResult = await query(
-      'SELECT * FROM persona WHERE documento = $1',
+      'SELECT * FROM persona WHERE documento = ?',
       [decoded.documento]
     );
 
@@ -89,7 +89,7 @@ export async function POST(request) {
       SELECT r.id, r.nombre, rp.sede_id
       FROM rol r
       INNER JOIN rol_persona rp ON r.id = rp.rol_id
-      WHERE rp.doc_persona = $1
+      WHERE rp.doc_persona = ?
     `, [persona.documento]);
 
     const rolesSecundarios = rolesResult.rows.filter(r => r.id !== nuevoRol.id);

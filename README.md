@@ -15,24 +15,28 @@ Sistema web integral desarrollado con Next.js que permite gestionar el inventari
 ## ✨ Características Principales
 
 ### 🔐 **Autenticación y Seguridad**
+
 - ✅ **Sistema de autenticación JWT** con bcryptjs para encriptación segura
 - ✅ **Middleware de protección** de rutas por rol
 - ✅ **Validación por sede** - Coordinadores y vigilantes solo ven solicitudes de su sede asignada
 - ✅ **Sesiones persistentes** con renovación automática de tokens
 
 ### 👥 **Gestión de Usuarios**
+
 - ✅ **6 roles específicos** con permisos diferenciados
 - ✅ **Dashboard personalizado** por rol de usuario
 - ✅ **Interfaz moderna de gestión** con tabla avanzada y filtros múltiples
 - ✅ **Registro público** con asignación de roles por administrador
 
 ### 📦 **Gestión de Inventario**
+
 - ✅ **Registro detallado de bienes** con códigos únicos
 - ✅ **Asignación de cuentadantes** por sede y ambiente
 - ✅ **Control de estados** (Disponible, En préstamo, En mantenimiento)
 - ✅ **Historial completo** de asignaciones y movimientos
 
 ### 📝 **Sistema de Solicitudes**
+
 - ✅ **Flujo de firmas optimizado** (Cuentadante → Coordinador → Vigilante)
 - ✅ **Estados simplificados** sin redundancias (7 estados principales)
 - ✅ **Observaciones obligatorias** en rechazos y cancelaciones
@@ -40,6 +44,7 @@ Sistema web integral desarrollado con Next.js que permite gestionar el inventari
 - ✅ **Filtros por estado específicos** según el rol del usuario
 
 ### 🎨 **Interfaz de Usuario**
+
 - ✅ **Diseño responsive** y moderno con TailwindCSS v4
 - ✅ **Paleta de colores SENA** (verde institucional)
 - ✅ **Paginación consistente** de 10 elementos en todas las tablas
@@ -50,6 +55,7 @@ Sistema web integral desarrollado con Next.js que permite gestionar el inventari
 - ✅ **Modales responsivos** con scroll independiente
 
 ### 🔧 **Herramientas de Desarrollo**
+
 - ✅ **Scripts automatizados** para configuración completa (4 scripts esenciales)
 - ✅ **Datos de prueba realistas** con historial variado
 - ✅ **Credenciales secuenciales** para facilitar testing (100001-100021)
@@ -58,12 +64,14 @@ Sistema web integral desarrollado con Next.js que permite gestionar el inventari
 ## 🛠️ Tecnologías
 
 ### Frontend
+
 - **Next.js 16.0.3** - Framework React con SSR
 - **React 19.2.0** - Biblioteca de UI
 - **TailwindCSS v4** - Framework CSS utility-first
 - **React Select** - Componentes de selección avanzados
 
 ### Backend
+
 - **Next.js API Routes** - Endpoints RESTful
 - **PostgreSQL** - Base de datos relacional
 - **JWT** - Autenticación con tokens
@@ -111,12 +119,14 @@ pnpm run dev
 ### 🔧 Instalación Paso a Paso (Detallada)
 
 **1. Clona el repositorio:**
+
 ```bash
 git clone https://github.com/mauro96s/Sistema-Gestion-Bienes-SENA.git
 cd Sistema-Gestion-Bienes-SENA
 ```
 
 **2. Instala las dependencias:**
+
 ```bash
 # Con pnpm (recomendado)
 pnpm install
@@ -128,11 +138,13 @@ npm install
 **3. Configura las variables de entorno:**
 
 Copia el archivo de ejemplo:
+
 ```bash
 cp .env.example .env.local
 ```
 
 Edita `.env.local` con tus credenciales:
+
 ```env
 # Base de datos PostgreSQL
 DB_HOST=localhost
@@ -151,6 +163,7 @@ NODE_ENV=development
 **4. Configura PostgreSQL:**
 
 Crea la base de datos:
+
 ```sql
 -- Conecta a PostgreSQL como superusuario
 psql -U postgres
@@ -163,6 +176,7 @@ CREATE DATABASE sena_bienes;
 ```
 
 Importa el esquema:
+
 ```bash
 psql -U postgres -d sena_bienes -f database_schema.sql
 ```
@@ -170,12 +184,14 @@ psql -U postgres -d sena_bienes -f database_schema.sql
 **5. Configura datos del sistema:**
 
 **Opción A: Configuración automática (RECOMENDADO)**
+
 ```bash
 # Ejecuta todos los scripts en secuencia
 pnpm run setup-complete
 ```
 
 **Opción B: Configuración manual paso a paso**
+
 ```bash
 # Paso 1: Resetea la base de datos
 pnpm run reset-db
@@ -191,6 +207,7 @@ pnpm run create-requests
 ```
 
 **6. Inicia el servidor:**
+
 ```bash
 # Desarrollo
 pnpm run dev
@@ -201,12 +218,14 @@ pnpm start
 ```
 
 **7. Accede al sistema:**
+
 - Abre tu navegador en [http://localhost:3000](http://localhost:3000)
 - Usa las credenciales de prueba (ver sección "Credenciales de Prueba")
 
 ## 🚀 Scripts Disponibles
 
 ### 🔨 Scripts de Desarrollo
+
 ```bash
 pnpm run dev          # Inicia servidor de desarrollo (http://localhost:3000)
 pnpm run build        # Construye la aplicación para producción
@@ -217,12 +236,14 @@ pnpm run lint         # Ejecuta el linter para verificar código
 ### 🗄️ Scripts de Base de Datos (Optimizados)
 
 **Configuración Automática (RECOMENDADO):**
+
 ```bash
 pnpm run setup-complete   # 🎯 Configuración completa automática
                          # Ejecuta: reset-db + setup-basic + create-inventory + create-requests
 ```
 
 **Configuración Manual (Paso a Paso):**
+
 ```bash
 pnpm run reset-db         # 1️⃣ Resetea base de datos y auto-increments
 pnpm run setup-basic      # 2️⃣ Crea usuarios, roles, sedes y ambientes
@@ -245,14 +266,14 @@ Después de ejecutar `pnpm run setup-complete` tendrás:
 
 ## 👥 Roles del Sistema
 
-| Rol | Permisos | Funciones Principales |
-|-----|----------|----------------------|
-| **Administrador** | Gestión completa de usuarios | Asigna roles y sedes (no firma solicitudes) |
-| **Almacenista** | Gestión de inventario | Registra y asigna bienes a cuentadantes |
-| **Cuentadante** | Gestión de bienes asignados | Aprueba/rechaza solicitudes (1ra firma) |
-| **Coordinador** | Aprobación de solicitudes | Aprueba solicitudes (2da firma - definitiva) |
-| **Vigilante** | Control de entrada/salida | Autoriza salidas (3ra firma) y entradas (4ta firma) |
-| **Usuario** | Solicitud de préstamos | Solicita préstamos de bienes (rol por defecto) |
+| Rol                     | Permisos                      | Funciones Principales                               |
+| ----------------------- | ----------------------------- | --------------------------------------------------- |
+| **Administrador** | Gestión completa de usuarios | Asigna roles y sedes (no firma solicitudes)         |
+| **Almacenista**   | Gestión de inventario        | Registra y asigna bienes a cuentadantes             |
+| **Cuentadante**   | Gestión de bienes asignados  | Aprueba/rechaza solicitudes (1ra firma)             |
+| **Coordinador**   | Aprobación de solicitudes    | Aprueba solicitudes (2da firma - definitiva)        |
+| **Vigilante**     | Control de entrada/salida     | Autoriza salidas (3ra firma) y entradas (4ta firma) |
+| **Usuario**       | Solicitud de préstamos       | Solicita préstamos de bienes (rol por defecto)     |
 
 ## 🔐 Credenciales de Prueba
 
@@ -260,34 +281,34 @@ Después de ejecutar `pnpm run setup-complete` tendrás:
 
 ### 👑 Usuarios Principales por Rol
 
-| Rol | Documento | Contraseña | Sede | Funciones Principales |
-|-----|-----------|------------|------|----------------------|
-| **👑 Administrador** | `100001` | `100001` | Todas las sedes | Gestión completa de usuarios y sistema |
-| **📦 Almacenista** | `100020` | `100020` | Calzado | Gestión de inventario y asignaciones |
-| **👤 Usuario Regular** | `100021` | `100021` | Comuneros | Solicitudes de préstamos |
+| Rol                          | Documento  | Contraseña | Sede            | Funciones Principales                   |
+| ---------------------------- | ---------- | ----------- | --------------- | --------------------------------------- |
+| **👑 Administrador**   | `100001` | `100001`  | Todas las sedes | Gestión completa de usuarios y sistema |
+| **📦 Almacenista**     | `100020` | `100020`  | Calzado         | Gestión de inventario y asignaciones   |
+| **👤 Usuario Regular** | `100021` | `100021`  | Comuneros       | Solicitudes de préstamos               |
 
 ### 🎯 Coordinadores por Sede
 
-| Sede | Documento | Contraseña | Función |
-|------|-----------|------------|---------|
-| **🏢 Pescadero** | `100014` | `100014` | Aprobación final de solicitudes |
-| **🏢 Calzado** | `100015` | `100015` | Aprobación final de solicitudes |
-| **🏢 Comuneros** | `100016` | `100016` | Aprobación final de solicitudes |
+| Sede                   | Documento  | Contraseña | Función                         |
+| ---------------------- | ---------- | ----------- | -------------------------------- |
+| **🏢 Pescadero** | `100014` | `100014`  | Aprobación final de solicitudes |
+| **🏢 Calzado**   | `100015` | `100015`  | Aprobación final de solicitudes |
+| **🏢 Comuneros** | `100016` | `100016`  | Aprobación final de solicitudes |
 
 ### 🛡️ Vigilantes por Sede
 
-| Sede | Documento | Contraseña | Función |
-|------|-----------|------------|---------|
-| **🏢 Pescadero** | `100017` | `100017` | Control de salidas y entradas |
-| **🏢 Calzado** | `100018` | `100018` | Control de salidas y entradas |
-| **🏢 Comuneros** | `100019` | `100019` | Control de salidas y entradas |
+| Sede                   | Documento  | Contraseña | Función                      |
+| ---------------------- | ---------- | ----------- | ----------------------------- |
+| **🏢 Pescadero** | `100017` | `100017`  | Control de salidas y entradas |
+| **🏢 Calzado**   | `100018` | `100018`  | Control de salidas y entradas |
+| **🏢 Comuneros** | `100019` | `100019`  | Control de salidas y entradas |
 
 ### 📋 Cuentadantes por Sede (4 por sede)
 
-| Sede | Documentos | Contraseña | Función |
-|------|------------|------------|---------|
+| Sede                   | Documentos              | Contraseña  | Función                            |
+| ---------------------- | ----------------------- | ------------ | ----------------------------------- |
 | **🏢 Pescadero** | `100002` - `100005` | Su documento | Primera firma (aprobación inicial) |
-| **🏢 Calzado** | `100006` - `100009` | Su documento | Primera firma (aprobación inicial) |
+| **🏢 Calzado**   | `100006` - `100009` | Su documento | Primera firma (aprobación inicial) |
 | **🏢 Comuneros** | `100010` - `100013` | Su documento | Primera firma (aprobación inicial) |
 
 ### 🔄 Ejemplos de Login
@@ -323,26 +344,27 @@ graph TD
     G --> H[📦 EN PRÉSTAMO]
     H --> I[🛡️ Vigilante registra entrada]
     I --> J[✅ DEVUELTO]
-    
+  
     A --> K{¿Usuario cancela?}
     K -->|Sí| L[🚫 CANCELADA]
 ```
 
 ### 📋 Estados del Sistema
 
-| Estado | Descripción | Siguiente Acción | Responsable |
-|--------|-------------|------------------|-------------|
-| **🟡 pendiente** | Solicitud creada | Aprobar/Rechazar | Cuentadante |
-| **🔵 firmada_cuentadante** | Aprobada por cuentadante | Aprobar/Rechazar | Coordinador |
-| **🟢 aprobada** | Aprobada por coordinador | Autorizar salida | Vigilante |
-| **📦 en_prestamo** | Bienes entregados | Registrar entrada | Vigilante |
-| **✅ devuelto** | Proceso completado | - | - |
-| **🚫 rechazada** | Rechazada en cualquier etapa | - | - |
-| **❌ cancelada** | Cancelada por usuario | - | - |
+| Estado                           | Descripción                 | Siguiente Acción | Responsable |
+| -------------------------------- | ---------------------------- | ----------------- | ----------- |
+| **🟡 pendiente**           | Solicitud creada             | Aprobar/Rechazar  | Cuentadante |
+| **🔵 firmada_cuentadante** | Aprobada por cuentadante     | Aprobar/Rechazar  | Coordinador |
+| **🟢 aprobada**            | Aprobada por coordinador     | Autorizar salida  | Vigilante   |
+| **📦 en_prestamo**         | Bienes entregados            | Registrar entrada | Vigilante   |
+| **✅ devuelto**            | Proceso completado           | -                 | -           |
+| **🚫 rechazada**           | Rechazada en cualquier etapa | -                 | -           |
+| **❌ cancelada**           | Cancelada por usuario        | -                 | -           |
 
 ### 🏢 Validaciones por Sede
 
 #### Restricciones de Visibilidad
+
 - **🎯 Coordinadores:** Solo ven solicitudes de su sede asignada
 - **🛡️ Vigilantes:** Solo ven solicitudes de su sede asignada
 - **📋 Cuentadantes:** Solo ven solicitudes de bienes bajo su responsabilidad
@@ -350,6 +372,7 @@ graph TD
 - **📦 Almacenistas:** Ven todo el inventario para gestión
 
 #### Flujo por Sede
+
 ```
 Sede Pescadero: Usuario → Cuentadante (100002-100005) → Coordinador (100014) → Vigilante (100017)
 Sede Calzado:   Usuario → Cuentadante (100006-100009) → Coordinador (100015) → Vigilante (100018)
@@ -387,12 +410,14 @@ Finalizando_Sena/
 ## 🎨 Diseño
 
 ### Paleta de Colores SENA
+
 - **Verde Principal**: `#39A900` - Color institucional SENA
 - **Verde Secundario**: `#007832` - Complementario
 - **Verde Hover**: `#f0fdf4` - Hover effects en tablas
 - **Fondos**: Blanco con gradientes verdes en login
 
 ### Componentes Destacados
+
 - **Tablas elegantes** con hover verde consistente (`hover:bg-green-50`)
 - **Paginación unificada** de 10 elementos en todas las tablas
 - **Modales responsivos** con scroll independiente (header y footer fijos)
@@ -405,12 +430,14 @@ Finalizando_Sena/
 ## 🆕 Mejoras y Optimizaciones Implementadas
 
 ### ✅ **Sistema de Autenticación y Seguridad**
+
 - **Validación por sede**: Coordinadores y vigilantes solo ven solicitudes de su sede asignada
 - **Middleware de protección**: Rutas protegidas por rol con redirección automática
 - **Tokens JWT seguros**: Renovación automática y expiración controlada
 - **Encriptación bcryptjs**: Contraseñas hasheadas con salt rounds optimizados
 
 ### ✅ **Optimización del Flujo de Solicitudes**
+
 - **Sistema de firmas unificado**: Todos los roles usan el mismo endpoint `/api/solicitudes/[id]/firmar`
 - **Estados simplificados**: Eliminado estado redundante "autorizada" (7 estados finales)
 - **Conteo de firmas corregido**: Incluye rechazos en el conteo (firma = false también cuenta)
@@ -418,6 +445,7 @@ Finalizando_Sena/
 - **Observaciones obligatorias**: En rechazos y cancelaciones con validación
 
 ### ✅ **Interfaz de Usuario Mejorada**
+
 - **Paginación consistente**: 10 elementos en todas las tablas del sistema
 - **Hover effects unificados**: Verde SENA (`hover:bg-green-50`) en todas las tablas
 - **Filtros avanzados**: Búsqueda por texto + filtros por estado específicos por rol
@@ -426,6 +454,7 @@ Finalizando_Sena/
 - **Gestión de usuarios moderna**: Interfaz de tabla con filtros múltiples (nombre, email, documento, rol, sede)
 
 ### ✅ **Scripts y Datos de Prueba**
+
 - **Scripts optimizados**: Simplificados de 8 a 4 archivos esenciales
 - **Configuración automática**: Un solo comando (`npm run setup-complete`) configura todo
 - **Datos de prueba realistas**: Historial variado con estados aleatorios (no lineales)
@@ -433,24 +462,28 @@ Finalizando_Sena/
 - **Distribución equitativa**: 4 cuentadantes por sede para pruebas completas
 
 ### ✅ **Filtros Específicos por Rol**
+
 - **Vigilante**: Solo estados que maneja (aprobada, en_prestamo, devuelto)
 - **Coordinador**: Estados de su flujo (firmada_cuentadante, aprobada, en_prestamo, devuelto, rechazada)
 - **Cuentadante**: Todos los estados incluyendo cancelada (para auditoría)
 - **Administrador**: Filtro adicional por sede en tabla de solicitudes
 
 ### ✅ **Validaciones de Negocio**
+
 - **Vigilante**: Solo autoriza salidas y entradas, no puede rechazar solicitudes
 - **Flujo de rechazo**: Proceso termina correctamente cuando alguien rechaza
 - **Cancelación con motivo**: Usuario debe proporcionar razón obligatoria al cancelar
 - **Alertas personalizadas**: Uso del sistema de confirmación del proyecto (no browser natives)
 
 ### 🔧 **Limpieza y Mantenimiento**
+
 - **Endpoints obsoletos eliminados**: Removido `/autorizar-salida` (unificado en `/firmar`)
 - **Archivos temporales limpiados**: Sin archivos de prueba o desarrollo
 - **Código optimizado**: Eliminación de redundancias y mejora de performance
 - **Documentación actualizada**: README y documentación de scripts completamente actualizados
 
 ### 📊 **Estadísticas del Sistema Optimizado**
+
 - **21 usuarios de prueba** con roles distribuidos correctamente
 - **105+ bienes de inventario** asignados equitativamente
 - **30+ solicitudes de prueba** con historial realista en diferentes estados
@@ -468,6 +501,7 @@ Finalizando_Sena/
 ### 🔐 Variables de Entorno Requeridas
 
 **Archivo: `.env.local` (Producción)**
+
 ```env
 # Base de datos PostgreSQL
 DB_HOST=tu_host_produccion.com
@@ -489,6 +523,7 @@ NEXTAUTH_URL=https://tu-dominio.com
 ### 🏗️ Proceso de Despliegue
 
 **1. Preparación del entorno:**
+
 ```bash
 # Clona en el servidor
 git clone https://github.com/mauro96s/Sistema-Gestion-Bienes-SENA.git
@@ -499,6 +534,7 @@ npm ci --only=production
 ```
 
 **2. Configuración de base de datos:**
+
 ```bash
 # Crea la base de datos en producción
 createdb sena_bienes
@@ -513,6 +549,7 @@ npm run setup-basic
 ```
 
 **3. Build y despliegue:**
+
 ```bash
 # Build de producción
 npm run build
@@ -524,16 +561,19 @@ npm start
 ### 🔒 Consideraciones de Seguridad
 
 **Variables de entorno:**
+
 - ✅ Usa contraseñas fuertes para PostgreSQL (mínimo 16 caracteres)
 - ✅ JWT_SECRET debe ser único y de al menos 32 caracteres
 - ✅ Nunca commits archivos `.env.local` al repositorio
 
 **Base de datos:**
+
 - ✅ Configura SSL para conexiones PostgreSQL
 - ✅ Restringe acceso por IP en PostgreSQL
 - ✅ Usa usuario de base de datos con permisos limitados
 
 **Servidor:**
+
 - ✅ Configura HTTPS con certificados SSL
 - ✅ Usa un reverse proxy (Nginx/Apache)
 - ✅ Configura firewall para puertos específicos
@@ -541,6 +581,7 @@ npm start
 ### 🌐 Configuración con Docker (Opcional)
 
 **Dockerfile:**
+
 ```dockerfile
 FROM node:18-alpine
 WORKDIR /app
@@ -553,6 +594,7 @@ CMD ["npm", "start"]
 ```
 
 **docker-compose.yml:**
+
 ```yaml
 version: '3.8'
 services:
@@ -584,12 +626,14 @@ volumes:
 ### 🔌 **Error de Conexión a PostgreSQL**
 
 **Síntomas:**
+
 ```
 Error: connect ECONNREFUSED 127.0.0.1:5432
 Error: password authentication failed for user "postgres"
 ```
 
 **Soluciones:**
+
 ```bash
 # 1. Verifica que PostgreSQL esté corriendo
 sudo service postgresql status    # Linux
@@ -609,12 +653,14 @@ psql -U postgres -l | grep sena_bienes
 ### 🔐 **Error al Iniciar Sesión**
 
 **Síntomas:**
+
 ```
 "Credenciales inválidas"
 "Usuario no encontrado"
 ```
 
 **Soluciones:**
+
 ```bash
 # 1. Verifica que los usuarios estén creados
 npm run setup-basic
@@ -633,12 +679,14 @@ psql -U postgres -d sena_bienes -c "SELECT documento, nombre, rol FROM usuarios 
 ### 📦 **Problemas con Dependencias**
 
 **Síntomas:**
+
 ```
 Module not found
 Cannot resolve dependency
 ```
 
 **Soluciones:**
+
 ```bash
 # 1. Limpia caché y reinstala
 rm -rf node_modules package-lock.json pnpm-lock.yaml
@@ -657,12 +705,14 @@ pnpm install --frozen-lockfile
 ### 🗄️ **Error en Scripts de Base de Datos**
 
 **Síntomas:**
+
 ```
 Error: relation "usuarios" does not exist
 Error: duplicate key value violates unique constraint
 ```
 
 **Soluciones:**
+
 ```bash
 # 1. Resetea completamente la base de datos
 npm run reset-db
@@ -680,11 +730,13 @@ npm run setup-complete
 ### 🌐 **Error de Puerto en Uso**
 
 **Síntomas:**
+
 ```
 Error: listen EADDRINUSE: address already in use :::3000
 ```
 
 **Soluciones:**
+
 ```bash
 # 1. Encuentra el proceso usando el puerto
 lsof -ti:3000  # macOS/Linux
@@ -701,12 +753,14 @@ PORT=3001 npm run dev
 ### 🔧 **Error de Build en Producción**
 
 **Síntomas:**
+
 ```
 Error: Build failed
 Type errors in production build
 ```
 
 **Soluciones:**
+
 ```bash
 # 1. Verifica el linter
 npm run lint
@@ -723,11 +777,13 @@ npm run build
 ### 📱 **Problemas de Interfaz**
 
 **Síntomas:**
+
 - Tablas no se ven correctamente
 - Filtros no funcionan
 - Paginación no responde
 
 **Soluciones:**
+
 ```bash
 # 1. Limpia caché del navegador
 Ctrl+Shift+R (Windows/Linux)
@@ -745,20 +801,21 @@ Cmd+Shift+R (macOS)
 Si los problemas persisten:
 
 1. **Revisa los logs:**
+
    ```bash
    # Logs del servidor
    npm run dev
-   
+
    # Logs de PostgreSQL
    tail -f /var/log/postgresql/postgresql-14-main.log
    ```
-
 2. **Verifica la documentación:**
+
    - `FLUJO_SISTEMA.md` - Flujo del sistema
    - `DOCUMENTACION_SCRIPTS.md` - Scripts detallados
    - `CHANGELOG.md` - Historial de cambios
-
 3. **Contacta al equipo de desarrollo:**
+
    - Incluye el error completo
    - Especifica tu sistema operativo
    - Menciona los pasos que seguiste
@@ -784,14 +841,14 @@ Este proyecto fue desarrollado para el **SENA (Servicio Nacional de Aprendizaje)
 Si encuentras problemas o necesitas asistencia:
 
 1. **Revisa la documentación:**
+
    - `README.md` - Guía completa de instalación y uso
    - `FLUJO_SISTEMA.md` - Flujo detallado del sistema
    - `DOCUMENTACION_SCRIPTS.md` - Scripts de configuración
    - `CHANGELOG.md` - Historial de cambios
-
 2. **Verifica la sección "Solución de Problemas"** en este README
-
 3. **Contacta al equipo de desarrollo** con:
+
    - Descripción detallada del problema
    - Pasos para reproducir el error
    - Logs o mensajes de error completos
@@ -815,5 +872,3 @@ Si encuentras problemas o necesitas asistencia:
 ---
 
 **Desarrollado con ❤️ para el SENA - Gestión eficiente de bienes institucionales**
-
-

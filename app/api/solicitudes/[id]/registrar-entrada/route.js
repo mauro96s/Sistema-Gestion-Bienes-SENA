@@ -1,16 +1,13 @@
-import { query } from '@/lib/db';
+import { query, getClient } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 /**
  * POST /api/solicitudes/[id]/registrar-entrada
  * 
  * El vigilante registra la entrada (devolución) de bienes
- * - Verifica que la solicitud esté en préstamo
- * - Registra firma de entrada del vigilante
- * - Cambia estado a 'devuelto'
- * - Desbloquea los bienes
  */
 export async function POST(request, { params }) {
+  let client;
   try {
     const resolvedParams = await params;
     const id = resolvedParams.id;
@@ -32,102 +29,78 @@ export async function POST(request, { params }) {
       );
     }
 
-    await query('BEGIN');
+    client = await getClient();
+    await client.query('START TRANSACTION');
 
-    try {
-      // 1. Verificar que la solicitud existe y está en préstamo
-      const solicitudResult = await query(
-        'SELECT estado FROM solicitudes WHERE id = $1',
-        [parseInt(id)]
-      );
+    // 1. Verificar que la solicitud existe y está en préstamo
+    const solicitudResult = await client.query(
+      'SELECT estado FROM solicitudes WHERE id = ?',
+      [parseInt(id)]
+    );
 
-      if (solicitudResult.rows.length === 0) {
-        await query('ROLLBACK');
-        return NextResponse.json(
-          { success: false, error: 'Solicitud no encontrada' },
-          { status: 404 }
-        );
-      }
-
-      const estadoActual = solicitudResult.rows[0].estado;
-
-      if (estadoActual !== 'en_prestamo') {
-        await query('ROLLBACK');
-        return NextResponse.json(
-          { success: false, error: 'La solicitud debe estar en préstamo para registrar entrada' },
-          { status: 400 }
-        );
-      }
-
-      // 2. Verificar si ya existe firma de entrada
-      // Buscamos cuántas firmas de vigilante hay.
-      // - 1 firma: Es la de salida. Procedemos con entrada.
-      // - 2 firmas: Ya tiene salida y entrada. Error.
-      const firmasExistentes = await query(
-        `SELECT id FROM firma_solicitud 
-         WHERE solicitud_id = $1 AND rol_usuario = 'vigilante'`,
-        [parseInt(id)]
-      );
-
-      if (firmasExistentes.rows.length >= 2) {
-        await query('ROLLBACK');
-        return NextResponse.json(
-          { success: false, error: 'La entrada ya fue registrada' },
-          { status: 400 }
-        );
-      }
-
-      // Opcional: Verificar que exista al menos 1 (la salida)
-      if (firmasExistentes.rows.length === 0) {
-        // Esto sería raro si el estado es 'en_prestamo', pero por seguridad
-        await query('ROLLBACK');
-        return NextResponse.json(
-          { success: false, error: 'No se ha registrado la salida previamente' },
-          { status: 400 }
-        );
-      }
-
-      // 3. Registrar firma de entrada del vigilante
-      // Se guarda como 'vigilante'. Será la segunda en orden cronológico.
-      await query(`
-        INSERT INTO firma_solicitud (solicitud_id, rol_usuario, doc_persona, firma, observacion)
-        VALUES ($1, 'vigilante', $2, true, $3)
-      `, [parseInt(id), documento, observacion || 'Entrada registrada']);
-
-      // 4. Actualizar estado de la solicitud
-      await query(
-        'UPDATE solicitudes SET estado = $1 WHERE id = $2',
-        ['devuelto', parseInt(id)]
-      );
-
-      // 5. Desbloquear los bienes de la solicitud
-      await query(`
-        UPDATE asignaciones 
-        SET bloqueado = false 
-        WHERE id IN (
-          SELECT asignacion_id 
-          FROM detalle_solicitud 
-          WHERE solicitud_id = $1
-        )
-      `, [parseInt(id)]);
-
-      await query('COMMIT');
-
-      return NextResponse.json({
-        success: true,
-        message: 'Entrada registrada exitosamente'
-      });
-
-    } catch (error) {
-      await query('ROLLBACK');
-      throw error;
+    if (solicitudResult.rows.length === 0) {
+      throw new Error('Solicitud no encontrada');
     }
 
+    const estadoActual = solicitudResult.rows[0].estado;
+
+    if (estadoActual !== 'en_prestamo') {
+      throw new Error('La solicitud debe estar en préstamo para registrar entrada');
+    }
+
+    // 2. Verificar si ya existe firma de entrada (la segunda firma de vigilante)
+    const firmasExistentes = await client.query(
+      `SELECT id FROM firma_solicitud 
+       WHERE solicitud_id = ? AND rol_usuario = 'vigilante'`,
+      [parseInt(id)]
+    );
+
+    if (firmasExistentes.rows.length >= 2) {
+      throw new Error('La entrada ya fue registrada');
+    }
+
+    if (firmasExistentes.rows.length === 0) {
+      throw new Error('No se ha registrado la salida previamente');
+    }
+
+    // 3. Registrar firma de entrada del vigilante
+    await client.query(`
+      INSERT INTO firma_solicitud (solicitud_id, rol_usuario, doc_persona, firma, observacion)
+      VALUES (?, 'vigilante', ?, 1, ?)
+    `, [parseInt(id), documento, observacion || 'Entrada registrada']);
+
+    // 4. Actualizar estado de la solicitud
+    await client.query(
+      'UPDATE solicitudes SET estado = ? WHERE id = ?',
+      ['devuelto', parseInt(id)]
+    );
+
+    // 5. Desbloquear los bienes de la solicitud
+    await client.query(`
+      UPDATE asignaciones 
+      SET bloqueado = 0 
+      WHERE id IN (
+        SELECT asignacion_id 
+        FROM detalle_solicitud 
+        WHERE solicitud_id = ?
+      )
+    `, [parseInt(id)]);
+
+    await client.query('COMMIT');
+
+    return NextResponse.json({
+      success: true,
+      message: 'Entrada registrada exitosamente'
+    });
+
   } catch (error) {
+    if (client) await client.query('ROLLBACK');
     console.error('Error al registrar entrada:', error);
     return NextResponse.json(
-      { success: false, error: 'Error al procesar el registro' },
+      { success: false, error: error.message || 'Error al procesar el registro' },
       { status: 500 }
     );
+  } finally {
+    if (client) client.release();
   }
 }

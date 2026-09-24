@@ -60,6 +60,7 @@ export default function MisBienes() {
       'disponible': { color: 'bg-green-100 text-green-800', label: 'Disponible' },
       'en_prestamo': { color: 'bg-blue-100 text-blue-800', label: 'En Préstamo' },
       'en_mantenimiento': { color: 'bg-yellow-100 text-yellow-800', label: 'En Mantenimiento' },
+      'deteriorado': { color: 'bg-red-100 text-red-800', label: 'Dañado' },
       'dado_de_baja': { color: 'bg-red-100 text-red-800', label: 'Dado de Baja' }
     };
     
@@ -103,6 +104,7 @@ export default function MisBienes() {
               <option value="disponible">Disponible</option>
               <option value="en_prestamo">En Préstamo</option>
               <option value="en_mantenimiento">En Mantenimiento</option>
+              <option value="deteriorado">Dañado</option>
             </select>
           </div>
         </div>

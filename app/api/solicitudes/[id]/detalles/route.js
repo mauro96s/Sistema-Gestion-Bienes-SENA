@@ -24,13 +24,13 @@ export async function GET(request, { params }) {
         b.serial,
         b.descripcion,
         m.nombre as marca,
-        p.nombres || ' ' || p.apellidos as cuentadante_nombre
+        CONCAT(p.nombres, ' ', p.apellidos) as cuentadante_nombre
       FROM detalle_solicitud ds
       JOIN asignaciones a ON ds.asignacion_id = a.id
       JOIN bienes b ON a.bien_id = b.id
       LEFT JOIN marcas m ON b.marca_id = m.id
       JOIN persona p ON a.doc_persona = p.documento
-      WHERE ds.solicitud_id = $1
+      WHERE ds.solicitud_id = ?
       ORDER BY b.placa ASC
     `, [parseInt(id)]);
 

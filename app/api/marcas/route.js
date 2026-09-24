@@ -37,9 +37,8 @@ export async function POST(request) {
     // Intentar insertar
     const result = await query(
       `INSERT INTO marcas (nombre) 
-       VALUES ($1) 
-       ON CONFLICT (nombre) DO UPDATE SET activo = true 
-       RETURNING id, nombre`,
+       VALUES (?) 
+       ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), activo = true`,
       [nombreNormalizado]
     );
 

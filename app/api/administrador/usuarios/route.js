@@ -42,7 +42,7 @@ export async function GET(request) {
     const usuariosResult = await query(`
       SELECT 
         p.documento as id,
-        p.nombres || ' ' || p.apellidos as nombre,
+        CONCAT(p.nombres, ' ', p.apellidos) as nombre,
         p.correo as email,
         p.documento,
         p.nombres,
@@ -68,7 +68,7 @@ export async function GET(request) {
         FROM rol r
         INNER JOIN rol_persona rp ON r.id = rp.rol_id
         LEFT JOIN sedes s ON rp.sede_id = s.id
-        WHERE rp.doc_persona = $1
+        WHERE rp.doc_persona = ?
         ORDER BY 
           CASE r.nombre
             WHEN 'coordinador' THEN 1

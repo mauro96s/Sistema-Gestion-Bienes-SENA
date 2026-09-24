@@ -61,7 +61,7 @@ export async function POST(request) {
 
     // 4. Verificar si el documento ya existe
     const documentoExiste = await query(
-      'SELECT documento FROM persona WHERE documento = $1',
+      'SELECT documento FROM persona WHERE documento = ?',
       [documento]
     );
 
@@ -74,7 +74,7 @@ export async function POST(request) {
 
     // 5. Verificar si el correo ya existe
     const correoExiste = await query(
-      'SELECT correo FROM persona WHERE correo = $1',
+      'SELECT correo FROM persona WHERE correo = ?',
       [correo]
     );
 
@@ -95,12 +95,12 @@ export async function POST(request) {
       // 8. Insertar la persona
       await query(`
         INSERT INTO persona (documento, tipo_doc, nombres, apellidos, correo, contraseña, telefono, direccion)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [documento, tipo_doc, nombres, apellidos, correo, hashedPassword, telefono || null, direccion || null]);
 
       // 9. Obtener el ID del rol "usuario"
       const rolResult = await query(
-        'SELECT id FROM rol WHERE nombre = $1',
+        'SELECT id FROM rol WHERE nombre = ?',
         ['usuario']
       );
 
@@ -122,7 +122,7 @@ export async function POST(request) {
       // 11. Asignar el rol "usuario" por defecto
       await query(`
         INSERT INTO rol_persona (rol_id, doc_persona, sede_id)
-        VALUES ($1, $2, $3)
+        VALUES (?, ?, ?)
       `, [rolUsuarioId, documento, sedeId]);
 
       // 12. Commit de la transacción

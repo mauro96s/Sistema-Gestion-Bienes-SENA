@@ -4,8 +4,7 @@ import { NextResponse } from 'next/server';
 /**
  * GET /api/bienes/disponibles
  * 
- * Obtiene todos los bienes que están asignados a cuentadantes
- * y NO están bloqueados (disponibles para préstamo)
+ * Obtiene bienes asignados que están en buen estado y no están bloqueados
  */
 export async function GET(request) {
   try {
@@ -20,21 +19,30 @@ export async function GET(request) {
         b.descripcion,
         b.modelo,
         m.nombre as marca,
-        amb.nombre as ambiente_nombre,
+        COALESCE(amb.nombre, 'Sin ambiente') as ambiente_nombre,
         p.documento as cuentadante_documento,
-        p.nombres || ' ' || p.apellidos as cuentadante_nombre
+        CONCAT(p.nombres, ' ', p.apellidos) as cuentadante_nombre
       FROM asignaciones a
       JOIN bienes b ON a.bien_id = b.id
       LEFT JOIN marcas m ON b.marca_id = m.id
-      JOIN ambientes amb ON a.ambiente_id = amb.id
+      LEFT JOIN ambientes amb ON a.ambiente_id = amb.id
       JOIN persona p ON a.doc_persona = p.documento
-      WHERE a.bloqueado = false
+      WHERE a.bloqueado = 0
+      AND COALESCE(
+        (SELECT eb.estado 
+         FROM estado_bien eb 
+         WHERE eb.bien_id = b.id 
+         ORDER BY eb.fecha_registro DESC 
+         LIMIT 1), 
+        'buen_estado'
+      ) = 'buen_estado'
     `;
 
     const params = [];
 
     if (sedeId) {
-      sqlQuery += ` AND amb.sede_id = $1`;
+      // Si hay sede_id, filtramos por la sede del ambiente
+      sqlQuery += ` AND (amb.sede_id = ? OR amb.sede_id IS NULL)`;
       params.push(sedeId);
     }
 

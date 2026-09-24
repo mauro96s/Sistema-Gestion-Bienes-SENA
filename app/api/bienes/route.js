@@ -1,4 +1,4 @@
-import { query } from '@/lib/db';
+import { query, getClient } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 export async function GET(request) {
@@ -6,8 +6,6 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
 
-    // Query optimizada para la nueva estructura
-    // Obtenemos el estado más reciente y la asignación más reciente mediante subconsultas
     let sqlQuery = `
       SELECT 
         b.id,
@@ -25,7 +23,7 @@ export async function GET(request) {
         ) as estado,
         (SELECT fecha_registro FROM estado_bien WHERE bien_id = b.id ORDER BY fecha_registro DESC LIMIT 1) as fecha_estado,
         (
-          SELECT p.nombres || ' ' || p.apellidos 
+          SELECT CONCAT(p.nombres, ' ', p.apellidos) 
           FROM asignaciones a 
           JOIN persona p ON a.doc_persona = p.documento 
           WHERE a.bien_id = b.id 
@@ -52,24 +50,22 @@ export async function GET(request) {
     `;
 
     const params = [];
-    let paramCount = 1;
 
     if (search) {
       sqlQuery += ` AND (
-        b.placa ILIKE $${paramCount} OR 
-        b.descripcion ILIKE $${paramCount} OR
-        b.modelo ILIKE $${paramCount} OR
-        b.serial ILIKE $${paramCount} OR
-        m.nombre ILIKE $${paramCount} OR
+        b.placa LIKE ? OR 
+        b.descripcion LIKE ? OR
+        b.modelo LIKE ? OR
+        b.serial LIKE ? OR
+        m.nombre LIKE ? OR
         EXISTS (
           SELECT 1 FROM asignaciones a2
           JOIN persona p2 ON a2.doc_persona = p2.documento
           WHERE a2.bien_id = b.id 
-          AND (p2.nombres ILIKE $${paramCount} OR p2.apellidos ILIKE $${paramCount})
+          AND (p2.nombres LIKE ? OR p2.apellidos LIKE ?)
         )
       )`;
-      params.push(`%${search}%`);
-      paramCount++;
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     sqlQuery += ' ORDER BY b.id DESC';
@@ -92,188 +88,149 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  let client;
   try {
     const body = await request.json();
-
-    // Validar campos requeridos
     const requiredFields = ['placa', 'descripcion', 'marca_id', 'costo'];
     for (const field of requiredFields) {
       if (!body[field]) {
-        return NextResponse.json(
-          { success: false, error: `Campo requerido: ${field}` },
-          { status: 400 }
-        );
+        return NextResponse.json({ success: false, error: `Campo requerido: ${field}` }, { status: 400 });
       }
     }
 
-    // Iniciar transacción
-    await query('BEGIN');
+    client = await getClient();
+    await client.query('START TRANSACTION');
 
-    try {
-      // 1. Insertar en bienes
-      const insertBienQuery = `
-        INSERT INTO bienes (
-          placa, descripcion, modelo, marca_id, serial,
-          costo, fecha_compra, vida_util
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *
-      `;
+    const insertBienQuery = `
+      INSERT INTO bienes (
+        placa, descripcion, modelo, marca_id, serial,
+        costo, fecha_compra, vida_util
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
 
-      const bienValues = [
-        body.placa,
-        body.descripcion,
-        body.modelo || null,
-        parseInt(body.marca_id),
-        body.serial || null,
-        parseFloat(body.costo),
-        body.fecha_compra || null,
-        body.vida_util ? parseInt(body.vida_util) : null
-      ];
+    const bienValues = [
+      body.placa,
+      body.descripcion,
+      body.modelo || null,
+      parseInt(body.marca_id),
+      body.serial || null,
+      parseFloat(body.costo),
+      body.fecha_compra || null,
+      body.vida_util ? parseInt(body.vida_util) : null
+    ];
 
-      const bienResult = await query(insertBienQuery, bienValues);
-      const nuevoBien = bienResult.rows[0];
+    const bienResult = await client.query(insertBienQuery, bienValues);
+    const bienId = bienResult.rows[0].id;
 
-      // 2. Insertar estado inicial en estado_bien
-      const estadoInicial = body.estado_inicial || 'buen_estado';
+    // Normalizar estado (buen_estado, deteriorado, en_mantenimiento, en_prestamo, dado_de_baja)
+    let estadoInicial = (body.estado_inicial || 'buen_estado').toLowerCase().trim().replace(/\s+/g, '_');
+    
+    // Mapeo de compatibilidad
+    if (estadoInicial === 'dañado') estadoInicial = 'deteriorado';
+    
+    await client.query(
+      'INSERT INTO estado_bien (bien_id, estado) VALUES (?, ?)',
+      [bienId, estadoInicial]
+    );
 
-      await query(
-        'INSERT INTO estado_bien (bien_id, estado) VALUES ($1, $2)',
-        [nuevoBien.id, estadoInicial]
-      );
+    await client.query('COMMIT');
 
-      await query('COMMIT');
-
-      return NextResponse.json({
-        success: true,
-        bien: nuevoBien,
-        message: 'Bien registrado exitosamente'
-      });
-
-    } catch (err) {
-      await query('ROLLBACK');
-      throw err;
-    }
+    return NextResponse.json({
+      success: true,
+      bien: { id: bienId, ...body },
+      message: 'Bien registrado exitosamente'
+    });
 
   } catch (error) {
+    if (client) await client.query('ROLLBACK');
     console.error('Error al registrar bien:', error);
-
-    if (error.code === '23505') { // Unique violation
-      return NextResponse.json(
-        { success: false, error: 'La placa ya existe en el sistema' },
-        { status: 400 }
-      );
+    if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
+      return NextResponse.json({ success: false, error: 'La placa ya existe' }, { status: 400 });
     }
-
-    return NextResponse.json(
-      { success: false, error: 'Error al registrar el bien', details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } finally {
+    if (client) client.release();
   }
 }
+
 export async function PUT(request) {
+  let client;
   try {
     const body = await request.json();
 
-    // Validar ID
     if (!body.id) {
-      return NextResponse.json(
-        { success: false, error: 'ID del bien requerido' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'ID del bien requerido' }, { status: 400 });
     }
 
-    // Validar campos requeridos mínimos
-    if (!body.placa || !body.descripcion || !body.marca_id || !body.costo) {
-      return NextResponse.json(
-        { success: false, error: 'Faltan campos obligatorios' },
-        { status: 400 }
-      );
-    }
+    client = await getClient();
+    await client.query('START TRANSACTION');
 
-    await query('BEGIN');
+    const updateQuery = `
+      UPDATE bienes 
+      SET 
+        placa = ?,
+        descripcion = ?,
+        modelo = ?,
+        marca_id = ?,
+        serial = ?,
+        costo = ?,
+        fecha_compra = ?,
+        vida_util = ?
+      WHERE id = ?
+    `;
 
-    try {
-      // 1. Actualizar datos básicos
-      const updateQuery = `
-        UPDATE bienes 
-        SET 
-          placa = $1,
-          descripcion = $2,
-          modelo = $3,
-          marca_id = $4,
-          serial = $5,
-          costo = $6,
-          fecha_compra = $7,
-          vida_util = $8
-        WHERE id = $9
-        RETURNING *
-      `;
+    const values = [
+      body.placa,
+      body.descripcion,
+      body.modelo || null,
+      parseInt(body.marca_id),
+      body.serial || null,
+      parseFloat(body.costo),
+      body.fecha_compra || null,
+      body.vida_util ? parseInt(body.vida_util) : null,
+      body.id
+    ];
 
-      const values = [
-        body.placa,
-        body.descripcion,
-        body.modelo || null,
-        parseInt(body.marca_id),
-        body.serial || null,
-        parseFloat(body.costo),
-        body.fecha_compra || null,
-        body.vida_util ? parseInt(body.vida_util) : null,
-        body.id
-      ];
+    const result = await client.query(updateQuery, values);
 
-      const result = await query(updateQuery, values);
+    if (body.estado) {
+      // Normalizar estado para MySQL
+      let estadoNormalizado = body.estado.toLowerCase().trim().replace(/\s+/g, '_');
+      
+      // Mapeo de compatibilidad
+      if (estadoNormalizado === 'dañado') estadoNormalizado = 'deteriorado';
+      
+      const lastStateRes = await client.query(`
+        SELECT estado FROM estado_bien 
+        WHERE bien_id = ? 
+        ORDER BY fecha_registro DESC LIMIT 1
+      `, [body.id]);
+      
+      const currentState = lastStateRes.rows[0]?.estado;
 
-      if (result.rowCount === 0) {
-        await query('ROLLBACK');
-        return NextResponse.json(
-          { success: false, error: 'Bien no encontrado' },
-          { status: 404 }
+      if (currentState !== estadoNormalizado) {
+        await client.query(
+          'INSERT INTO estado_bien (bien_id, estado) VALUES (?, ?)',
+          [body.id, estadoNormalizado]
         );
       }
-
-      // 2. Verificar si el estado cambió para registrar historial
-      if (body.estado) {
-        // Obtener último estado
-        const lastStateQuery = `
-          SELECT estado FROM estado_bien 
-          WHERE bien_id = $1 
-          ORDER BY fecha_registro DESC LIMIT 1
-        `;
-        const lastStateRes = await query(lastStateQuery, [body.id]);
-        const currentState = lastStateRes.rows[0]?.estado;
-
-        if (currentState !== body.estado) {
-          await query(
-            'INSERT INTO estado_bien (bien_id, estado) VALUES ($1, $2)',
-            [body.id, body.estado]
-          );
-        }
-      }
-
-      await query('COMMIT');
-
-      return NextResponse.json({
-        success: true,
-        bien: result.rows[0],
-        message: 'Bien actualizado correctamente'
-      });
-
-    } catch (err) {
-      await query('ROLLBACK');
-      throw err;
     }
+
+    await client.query('COMMIT');
+
+    return NextResponse.json({
+      success: true,
+      message: 'Bien actualizado correctamente'
+    });
 
   } catch (error) {
+    if (client) await client.query('ROLLBACK');
     console.error('Error updating bien:', error);
-    if (error.code === '23505') {
-      return NextResponse.json(
-        { success: false, error: 'La placa ya está registrada en otro bien' },
-        { status: 400 }
-      );
+    if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
+      return NextResponse.json({ success: false, error: 'La placa ya está registrada' }, { status: 400 });
     }
-    return NextResponse.json(
-      { success: false, error: 'Error al actualizar el bien' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } finally {
+    if (client) client.release();
   }
 }

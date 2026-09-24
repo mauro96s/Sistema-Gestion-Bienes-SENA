@@ -15,7 +15,7 @@ export async function GET() {
     // Obtener el último número de placa del año actual
     const result = await query(
       `SELECT placa FROM bienes 
-       WHERE placa LIKE $1 
+       WHERE placa LIKE ? 
        ORDER BY placa DESC 
        LIMIT 1`,
       [`SENA-${year}-%`]

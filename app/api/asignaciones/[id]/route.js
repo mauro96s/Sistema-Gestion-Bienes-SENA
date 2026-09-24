@@ -27,7 +27,7 @@ export async function DELETE(request, { params }) {
       SELECT a.id, b.placa, a.bloqueado
       FROM asignaciones a
       JOIN bienes b ON a.bien_id = b.id
-      WHERE a.id = $1
+      WHERE a.id = ?
     `;
     
     const checkResult = await query(checkQuery, [asignacionId]);
@@ -56,7 +56,7 @@ export async function DELETE(request, { params }) {
     const solicitudesQuery = `
       SELECT COUNT(*) as total
       FROM detalle_solicitud ds
-      WHERE ds.asignacion_id = $1
+      WHERE ds.asignacion_id = ?
     `;
     
     const solicitudesResult = await query(solicitudesQuery, [asignacionId]);
@@ -75,8 +75,7 @@ export async function DELETE(request, { params }) {
     // Eliminar la asignación
     const deleteQuery = `
       DELETE FROM asignaciones 
-      WHERE id = $1
-      RETURNING *
+      WHERE id = ?
     `;
 
     await query(deleteQuery, [asignacionId]);

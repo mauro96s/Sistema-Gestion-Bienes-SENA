@@ -26,24 +26,26 @@ export async function GET(request, { params }) {
         fs.firma,
         fs.observacion,
         fs.fecha_firmado,
-        p.nombres || ' ' || p.apellidos as firmante_nombre
+        CONCAT(p.nombres, ' ', p.apellidos) as firmante_nombre
       FROM firma_solicitud fs
       JOIN persona p ON fs.doc_persona = p.documento
-      WHERE fs.solicitud_id = $1
+      WHERE fs.solicitud_id = ?
       ORDER BY fs.fecha_firmado ASC
     `, [parseInt(id)]);
 
     // Transformar roles de vigilante para compatibilidad con Frontend
     let vigilanteCount = 0;
     const firmasTransformadas = result.rows.map(firma => {
-      if (firma.rol_usuario === 'vigilante') {
+      const firmaTransformada = {
+        ...firma,
+        firma: !!firma.firma // Convertir 1/0 a true/false
+      };
+
+      if (firmaTransformada.rol_usuario === 'vigilante') {
         vigilanteCount++;
-        return {
-          ...firma,
-          rol_usuario: vigilanteCount === 1 ? 'vigilante_salida' : 'vigilante_entrada'
-        };
+        firmaTransformada.rol_usuario = vigilanteCount === 1 ? 'vigilante_salida' : 'vigilante_entrada';
       }
-      return firma;
+      return firmaTransformada;
     });
 
     return NextResponse.json({

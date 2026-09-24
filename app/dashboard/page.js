@@ -240,7 +240,8 @@ const DashboardUsuario = () => {
   const [stats, setStats] = useState({
     solicitudesActivas: 0,
     solicitudesAprobadas: 0,
-    solicitudesRechazadas: 0
+    solicitudesRechazadas: 0,
+    solicitudesCanceladas: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -267,7 +268,7 @@ const DashboardUsuario = () => {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <StatCard
         title="Solicitudes Activas"
         value={loading ? '...' : stats.solicitudesActivas.toString()}
@@ -281,7 +282,12 @@ const DashboardUsuario = () => {
       <StatCard
         title="Rechazadas"
         value={loading ? '...' : stats.solicitudesRechazadas.toString()}
-        icon={<ClipboardIcon className="w-8 h-8" />}
+        icon={<AlertIcon className="w-8 h-8 text-red-500" />}
+      />
+      <StatCard
+        title="Canceladas"
+        value={loading ? '...' : stats.solicitudesCanceladas.toString()}
+        icon={<ClipboardIcon className="w-8 h-8 text-gray-500" />}
       />
     </div>
   );

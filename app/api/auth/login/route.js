@@ -47,7 +47,7 @@ export async function POST(request) {
 
     // 3. Buscar persona en la base de datos por documento
     const result = await query(
-      'SELECT * FROM persona WHERE documento = $1',
+      'SELECT * FROM persona WHERE documento = ?',
       [documento]
     );
 
@@ -78,7 +78,7 @@ export async function POST(request) {
       SELECT r.id, r.nombre, rp.sede_id
       FROM rol r
       INNER JOIN rol_persona rp ON r.id = rp.rol_id
-      WHERE rp.doc_persona = $1
+      WHERE rp.doc_persona = ?
       ORDER BY 
         CASE r.nombre
           WHEN 'coordinador' THEN 1

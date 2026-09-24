@@ -51,7 +51,7 @@ export async function POST(request, context) {
 
     // 4. Validar que la persona exista
     const personaResult = await query(
-      'SELECT documento FROM persona WHERE documento = $1',
+      'SELECT documento FROM persona WHERE documento = ?',
       [documento]
     );
 
@@ -64,7 +64,7 @@ export async function POST(request, context) {
 
     // 5. Obtener el ID del rol "usuario"
     const rolUsuarioResult = await query(
-      'SELECT id FROM rol WHERE nombre = $1',
+      'SELECT id FROM rol WHERE nombre = ?',
       ['usuario']
     );
 
@@ -123,7 +123,7 @@ export async function POST(request, context) {
     try {
       // 11. Eliminar todos los roles actuales de la persona
       await query(
-        'DELETE FROM rol_persona WHERE doc_persona = $1',
+        'DELETE FROM rol_persona WHERE doc_persona = ?',
         [documento]
       );
 
@@ -131,7 +131,7 @@ export async function POST(request, context) {
       for (const rolId of rolesFinales) {
         await query(`
           INSERT INTO rol_persona (rol_id, doc_persona, sede_id)
-          VALUES ($1, $2, $3)
+          VALUES (?, ?, ?)
         `, [rolId, documento, sedeId]);
       }
 

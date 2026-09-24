@@ -9,7 +9,7 @@ export async function GET() {
         p.documento as id,
         p.nombres,
         p.apellidos,
-        p.nombres || ' ' || p.apellidos as nombre,
+        CONCAT(p.nombres, ' ', p.apellidos) as nombre,
         p.correo as email,
         rp.sede_id,
         s.nombre as sede_nombre

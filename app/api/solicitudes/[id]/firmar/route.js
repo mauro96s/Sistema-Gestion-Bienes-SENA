@@ -1,4 +1,4 @@
-import { query } from '@/lib/db';
+import { query, getClient } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
 /**
@@ -8,34 +8,29 @@ import { NextResponse } from 'next/server';
  * y actualiza el estado de la solicitud según corresponda
  */
 export async function POST(request, { params }) {
-  const client = await query('BEGIN');
+  let client;
   
   try {
     const resolvedParams = await params;
     const id = resolvedParams.id;
-
-    if (!id || isNaN(parseInt(id))) {
-      await query('ROLLBACK');
-      return NextResponse.json(
-        { success: false, error: 'ID inválido' },
-        { status: 400 }
-      );
-    }
-
     const body = await request.json();
     const { rol, documento, firma, observacion } = body;
 
+    // Obtener un cliente dedicado para la transacción
+    client = await getClient();
+    await client.query('START TRANSACTION');
+
+    if (!id || isNaN(parseInt(id))) {
+      throw new Error('ID inválido');
+    }
+
     if (!rol || !documento || firma === undefined) {
-      await query('ROLLBACK');
-      return NextResponse.json(
-        { success: false, error: 'Faltan campos requeridos' },
-        { status: 400 }
-      );
+      throw new Error('Faltan campos requeridos');
     }
 
     // Validar que si rechaza, debe incluir observación obligatoria
     if (firma === false && (!observacion || observacion.trim() === '')) {
-      await query('ROLLBACK');
+      await client.query('ROLLBACK');
       return NextResponse.json(
         { success: false, error: 'La observación es obligatoria cuando se rechaza una solicitud' },
         { status: 400 }
@@ -43,149 +38,93 @@ export async function POST(request, { params }) {
     }
 
     // Verificar que la solicitud existe
-    const solicitudResult = await query(
-      'SELECT estado FROM solicitudes WHERE id = $1',
+    const solicitudResult = await client.query(
+      'SELECT estado FROM solicitudes WHERE id = ?',
       [parseInt(id)]
     );
 
     if (solicitudResult.rows.length === 0) {
-      await query('ROLLBACK');
-      return NextResponse.json(
-        { success: false, error: 'Solicitud no encontrada' },
-        { status: 404 }
-      );
+      throw new Error('Solicitud no encontrada');
     }
 
     const estadoActual = solicitudResult.rows[0].estado;
 
     // Validar que se puede firmar según el estado
     if (rol === 'cuentadante' && estadoActual !== 'pendiente') {
-      await query('ROLLBACK');
-      return NextResponse.json(
-        { success: false, error: 'Esta solicitud ya no está pendiente' },
-        { status: 400 }
-      );
+      throw new Error('Esta solicitud ya no está pendiente');
     }
 
     if (rol === 'coordinador' && estadoActual !== 'firmada_cuentadante') {
-      await query('ROLLBACK');
-      return NextResponse.json(
-        { success: false, error: 'El cuentadante aún no ha firmado' },
-        { status: 400 }
-      );
+      throw new Error('El cuentadante aún no ha firmado');
     }
 
     if (rol === 'vigilante' && estadoActual !== 'aprobada') {
-      await query('ROLLBACK');
-      return NextResponse.json(
-        { success: false, error: 'La solicitud debe estar aprobada por el coordinador' },
-        { status: 400 }
-      );
+      throw new Error('La solicitud debe estar aprobada por el coordinador');
     }
 
-    // Validar que el coordinador y vigilante pertenezcan a la sede de la solicitud
+    // Validar sede para coordinador y vigilante
     if (rol === 'coordinador' || rol === 'vigilante') {
       const rolNombre = rol === 'coordinador' ? 'coordinador' : 'vigilante';
-      const sedeValidationResult = await query(`
+      const sedeValidationResult = await client.query(`
         SELECT s.sede_id, rp.sede_id as usuario_sede_id
         FROM solicitudes s
-        LEFT JOIN rol_persona rp ON rp.doc_persona = $2
-        LEFT JOIN rol r ON rp.rol_id = r.id AND r.nombre = $3
-        WHERE s.id = $1
-      `, [parseInt(id), documento, rolNombre]);
+        INNER JOIN rol_persona rp ON rp.doc_persona = ?
+        INNER JOIN rol r ON rp.rol_id = r.id
+        WHERE s.id = ? AND r.nombre = ?
+      `, [documento, parseInt(id), rolNombre]);
 
       if (sedeValidationResult.rows.length === 0) {
-        await query('ROLLBACK');
-        return NextResponse.json(
-          { success: false, error: 'Solicitud no encontrada' },
-          { status: 404 }
-        );
+        throw new Error(`No tienes permisos como ${rolNombre} o la solicitud no existe`);
       }
 
       const { sede_id: solicitudSedeId, usuario_sede_id: usuarioSedeId } = sedeValidationResult.rows[0];
 
       if (!usuarioSedeId) {
-        await query('ROLLBACK');
-        return NextResponse.json(
-          { success: false, error: 'No tienes una sede asignada. Contacta al administrador para que te asigne una sede.' },
-          { status: 403 }
-        );
+        throw new Error('No tienes una sede asignada. Contacta al administrador.');
       }
 
       if (solicitudSedeId !== usuarioSedeId) {
-        await query('ROLLBACK');
-        return NextResponse.json(
-          { success: false, error: 'Solo puedes firmar solicitudes de tu sede asignada' },
-          { status: 403 }
-        );
+        throw new Error('Solo puedes firmar solicitudes de tu sede asignada');
       }
     }
 
-    // El administrador ya no puede firmar solicitudes
-    if (rol === 'administrador') {
-      await query('ROLLBACK');
-      return NextResponse.json(
-        { success: false, error: 'El administrador no puede firmar solicitudes' },
-        { status: 403 }
-      );
-    }
-
-    // Registrar la firma
-    await query(`
+    // Registrar la firma (firma en MySQL es TINYINT(1), usamos 1 o 0)
+    await client.query(`
       INSERT INTO firma_solicitud (solicitud_id, rol_usuario, doc_persona, firma, observacion)
-      VALUES ($1, $2, $3, $4, $5)
-    `, [parseInt(id), rol, documento, firma, observacion || null]);
+      VALUES (?, ?, ?, ?, ?)
+    `, [parseInt(id), rol, documento, firma ? 1 : 0, observacion || null]);
 
     // Actualizar estado de la solicitud
-    let nuevoEstado;
+    let nuevoEstado = estadoActual;
     if (!firma) {
-      // Si rechaza, la solicitud queda rechazada
       nuevoEstado = 'rechazada';
-      
-      // Desbloquear bienes cuando se rechaza (cuentadante, coordinador o vigilante)
-      if (rol === 'cuentadante' || rol === 'coordinador' || rol === 'vigilante') {
-        await query(`
-          UPDATE asignaciones 
-          SET bloqueado = false 
-          WHERE id IN (
-            SELECT asignacion_id 
-            FROM detalle_solicitud 
-            WHERE solicitud_id = $1
-          )
-        `, [parseInt(id)]);
-      }
+      // Desbloquear bienes
+      await client.query(`
+        UPDATE asignaciones SET bloqueado = 0 
+        WHERE id IN (
+          SELECT asignacion_id FROM detalle_solicitud WHERE solicitud_id = ?
+        )
+      `, [parseInt(id)]);
     } else {
-      // Si aprueba, avanza al siguiente estado
       if (rol === 'cuentadante') {
         nuevoEstado = 'firmada_cuentadante';
-        
-        // BLOQUEAR BIENES cuando el cuentadante firma
-        await query(`
-          UPDATE asignaciones 
-          SET bloqueado = true 
+        // Bloquear bienes
+        await client.query(`
+          UPDATE asignaciones SET bloqueado = 1 
           WHERE id IN (
-            SELECT asignacion_id 
-            FROM detalle_solicitud 
-            WHERE solicitud_id = $1
+            SELECT asignacion_id FROM detalle_solicitud WHERE solicitud_id = ?
           )
         `, [parseInt(id)]);
       } else if (rol === 'coordinador') {
-        // El coordinador aprueba la solicitud
         nuevoEstado = 'aprobada';
-        // Los bienes ya están bloqueados desde la firma del cuentadante
       } else if (rol === 'vigilante') {
-        // El vigilante firma = entrega física = en préstamo
         nuevoEstado = 'en_prestamo';
-        // Los bienes ya están bloqueados desde la firma del cuentadante
       }
     }
 
-    await query(
-      'UPDATE solicitudes SET estado = $1 WHERE id = $2',
-      [nuevoEstado, parseInt(id)]
-    );
-
-    await query('COMMIT');
+    await client.query('UPDATE solicitudes SET estado = ? WHERE id = ?', [nuevoEstado, parseInt(id)]);
+    
+    await client.query('COMMIT');
 
     return NextResponse.json({
       success: true,
@@ -194,11 +133,13 @@ export async function POST(request, { params }) {
     });
 
   } catch (error) {
-    await query('ROLLBACK');
+    if (client) await client.query('ROLLBACK');
     console.error('Error al firmar solicitud:', error);
     return NextResponse.json(
-      { success: false, error: 'Error al procesar la firma' },
+      { success: false, error: error.message || 'Error al procesar la firma' },
       { status: 500 }
     );
+  } finally {
+    if (client) client.release();
   }
 }

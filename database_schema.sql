@@ -1,43 +1,56 @@
 -- ========================================
--- INICIALIZACIÓN DE BASE DE DATOS (V2)
--- Archivo: init_db_v2.sql
--- Descripción: Creación desde cero del esquema reestructurado
+-- INICIALIZACIÓN DE BASE DE DATOS (MySQL)
+-- Archivo: database_schema.sql
+-- Descripción: Creación desde cero del esquema para MySQL
 -- ADVERTENCIA: ESTE SCRIPT BORRA TODOS LOS DATOS EXISTENTES
 -- ========================================
 
--- Eliminar esquema público y recrearlo para limpiar todo
-DROP SCHEMA public CASCADE;
-CREATE SCHEMA public;
-GRANT ALL ON SCHEMA public TO postgres;
-GRANT ALL ON SCHEMA public TO public;
+SET FOREIGN_KEY_CHECKS = 0;
 
-BEGIN;
+-- Eliminar tablas si existen
+DROP TABLE IF EXISTS firma_solicitud;
+DROP TABLE IF EXISTS detalle_solicitud;
+DROP TABLE IF EXISTS solicitudes;
+DROP TABLE IF EXISTS asignaciones;
+DROP TABLE IF EXISTS estado_bien;
+DROP TABLE IF EXISTS bienes;
+DROP TABLE IF EXISTS rol_persona;
+DROP TABLE IF EXISTS persona;
+DROP TABLE IF EXISTS rol;
+DROP TABLE IF EXISTS marcas;
+DROP TABLE IF EXISTS ambientes;
+DROP TABLE IF EXISTS sedes;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+START TRANSACTION;
 
 -- ========================================
 -- 1. TABLAS DE CATÁLOGO / CONFIGURACIÓN
 -- ========================================
 
 CREATE TABLE sedes (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL UNIQUE
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE ambientes (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
-    sede_id INTEGER REFERENCES sedes(id) ON DELETE CASCADE
-);
+    sede_id INTEGER,
+    FOREIGN KEY (sede_id) REFERENCES sedes(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
 
 CREATE TABLE marcas (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL UNIQUE,
-    activo BOOLEAN DEFAULT true
-);
+    activo TINYINT(1) DEFAULT 1
+) ENGINE=InnoDB;
 
 CREATE TABLE rol (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(50) NOT NULL UNIQUE
-);
+) ENGINE=InnoDB;
 
 -- ========================================
 -- 2. TABLAS DE USUARIOS (PERSONA)
@@ -52,100 +65,98 @@ CREATE TABLE persona (
     telefono VARCHAR(20),
     tipo_doc VARCHAR(10),
     contraseña VARCHAR(255) NOT NULL
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE rol_persona (
-    rol_id INTEGER REFERENCES rol(id),
-    doc_persona VARCHAR(20) REFERENCES persona(documento),
-    sede_id INTEGER REFERENCES sedes(id),
-    PRIMARY KEY (rol_id, doc_persona)
-);
+    rol_id INTEGER,
+    doc_persona VARCHAR(20),
+    sede_id INTEGER,
+    PRIMARY KEY (rol_id, doc_persona),
+    FOREIGN KEY (rol_id) REFERENCES rol(id),
+    FOREIGN KEY (doc_persona) REFERENCES persona(documento),
+    FOREIGN KEY (sede_id) REFERENCES sedes(id)
+) ENGINE=InnoDB;
 
 -- ========================================
 -- 3. TABLAS DE INVENTARIO
 -- ========================================
 
 CREATE TABLE bienes (
-    id SERIAL PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     placa VARCHAR(50) UNIQUE NOT NULL,
     descripcion TEXT,
     modelo VARCHAR(100),
-    marca_id INTEGER REFERENCES marcas(id),
+    marca_id INTEGER,
     serial VARCHAR(100),
     fecha_compra DATE,
     vida_util INTEGER, -- En años
-    costo NUMERIC(15, 2)
-);
+    costo DECIMAL(15, 2),
+    FOREIGN KEY (marca_id) REFERENCES marcas(id)
+) ENGINE=InnoDB;
 
 CREATE TABLE estado_bien (
-    id SERIAL PRIMARY KEY,
-    bien_id INTEGER REFERENCES bienes(id) ON DELETE CASCADE,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    bien_id INTEGER,
     estado VARCHAR(50) NOT NULL,
-    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (bien_id) REFERENCES bienes(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
 
 CREATE TABLE asignaciones (
-    id SERIAL PRIMARY KEY,
-    bien_id INTEGER REFERENCES bienes(id),
-    ambiente_id INTEGER REFERENCES ambientes(id),
-    doc_persona VARCHAR(20) REFERENCES persona(documento),
-    bloqueado BOOLEAN DEFAULT false,
-    fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    bien_id INTEGER,
+    ambiente_id INTEGER,
+    doc_persona VARCHAR(20),
+    bloqueado TINYINT(1) DEFAULT 0,
+    fecha_asignacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (bien_id) REFERENCES bienes(id),
+    FOREIGN KEY (ambiente_id) REFERENCES ambientes(id),
+    FOREIGN KEY (doc_persona) REFERENCES persona(documento)
+) ENGINE=InnoDB;
 
 -- ========================================
 -- 4. TABLAS DE SOLICITUDES
 -- ========================================
 
 CREATE TABLE solicitudes (
-    id SERIAL PRIMARY KEY,
-    fecha_ini_prestamo TIMESTAMP NOT NULL,
-    fecha_fin_prestamo TIMESTAMP NOT NULL,
-    doc_persona VARCHAR(20) REFERENCES persona(documento),
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fecha_ini_prestamo TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_fin_prestamo TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    doc_persona VARCHAR(20),
     destino VARCHAR(255),
     motivo TEXT,
     estado VARCHAR(50) DEFAULT 'pendiente',
     observaciones TEXT,
-    sede_id INTEGER REFERENCES sedes(id),
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+    sede_id INTEGER,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (doc_persona) REFERENCES persona(documento),
+    FOREIGN KEY (sede_id) REFERENCES sedes(id)
+) ENGINE=InnoDB;
 
 CREATE TABLE detalle_solicitud (
-    id SERIAL PRIMARY KEY,
-    solicitud_id INTEGER REFERENCES solicitudes(id) ON DELETE CASCADE,
-    asignacion_id INTEGER REFERENCES asignaciones(id)
-);
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    solicitud_id INTEGER,
+    asignacion_id INTEGER,
+    FOREIGN KEY (solicitud_id) REFERENCES solicitudes(id) ON DELETE CASCADE,
+    FOREIGN KEY (asignacion_id) REFERENCES asignaciones(id)
+) ENGINE=InnoDB;
 
 CREATE TABLE firma_solicitud (
-    id SERIAL PRIMARY KEY,
-    solicitud_id INTEGER REFERENCES solicitudes(id) ON DELETE CASCADE,
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    solicitud_id INTEGER,
     rol_usuario VARCHAR(50),
-    doc_persona VARCHAR(20) REFERENCES persona(documento),
-    firma BOOLEAN DEFAULT false,
+    doc_persona VARCHAR(20),
+    firma TINYINT(1) DEFAULT 0,
     observacion TEXT,
-    fecha_firmado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- ========================================
--- 5. DATOS INICIALES BÁSICOS (Opcional)
--- ========================================
--- Insertar roles básicos
-INSERT INTO rol (nombre) VALUES 
-    ('administrador'), 
-    ('almacenista'), 
-    ('cuentadante'), 
-    ('usuario'), 
-    ('vigilante'), 
-    ('coordinador');
-
--- Insertar marcas comunes
-INSERT INTO marcas (nombre) VALUES ('Generico'), ('HP'), ('Dell'), ('Lenovo'), ('Samsung');
+    fecha_firmado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (solicitud_id) REFERENCES solicitudes(id) ON DELETE CASCADE,
+    FOREIGN KEY (doc_persona) REFERENCES persona(documento)
+) ENGINE=InnoDB;
 
 -- ========================================
 -- 6. ÍNDICES PARA PERFORMANCE
 -- ========================================
 
--- Índices para búsquedas frecuentes
 CREATE INDEX idx_solicitudes_estado ON solicitudes(estado);
 CREATE INDEX idx_solicitudes_doc_persona ON solicitudes(doc_persona);
 CREATE INDEX idx_solicitudes_sede_id ON solicitudes(sede_id);
@@ -178,6 +189,6 @@ ALTER TABLE solicitudes ADD CONSTRAINT chk_fechas_logicas
 
 -- Validar estados de bien
 ALTER TABLE estado_bien ADD CONSTRAINT chk_estado_bien 
-    CHECK (estado IN ('disponible', 'en_prestamo', 'en_mantenimiento', 'dado_de_baja'));
+    CHECK (estado IN ('buen_estado', 'deteriorado', 'en_mantenimiento', 'en_prestamo', 'dado_de_baja'));
 
 COMMIT;

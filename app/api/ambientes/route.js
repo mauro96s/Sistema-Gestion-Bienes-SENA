@@ -24,7 +24,7 @@ export async function GET(request) {
     const params = [];
 
     if (sedeId) {
-      sqlQuery += ` WHERE a.sede_id = $1`;
+      sqlQuery += ` WHERE a.sede_id = ?`;
       params.push(sedeId);
     }
 

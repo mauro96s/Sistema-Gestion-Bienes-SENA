@@ -145,7 +145,7 @@ export default function AsignarBienes() {
         setSuccess(true);
         setError('');
         setTimeout(() => {
-          router.push('/dashboard/almacenista/inventario');
+          router.push('/dashboard/almacenista/historial-asignaciones');
         }, 2000);
       } else {
         setError(data.error || 'Error al realizar la asignación');
@@ -219,7 +219,7 @@ export default function AsignarBienes() {
       {success && (
         <div className="mb-6 bg-green-50 border border-green-200 text-green-800 rounded-lg p-4">
           <p className="font-semibold">¡Asignación realizada exitosamente!</p>
-          <p className="text-sm">Redirigiendo al inventario...</p>
+          <p className="text-sm">Redirigiendo al historial de asignaciones...</p>
         </div>
       )}
 

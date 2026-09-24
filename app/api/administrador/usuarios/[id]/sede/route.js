@@ -50,7 +50,7 @@ export async function POST(request, context) {
 
     // 4. Validar que la persona exista
     const personaResult = await query(
-      'SELECT documento FROM persona WHERE documento = $1',
+      'SELECT documento FROM persona WHERE documento = ?',
       [documento]
     );
 
@@ -63,7 +63,7 @@ export async function POST(request, context) {
 
     // 5. Validar que la sede exista
     const sedeResult = await query(
-      'SELECT id FROM sedes WHERE id = $1',
+      'SELECT id FROM sedes WHERE id = ?',
       [sedeId]
     );
 
@@ -77,8 +77,8 @@ export async function POST(request, context) {
     // 6. Actualizar la sede de todos los roles de la persona
     await query(`
       UPDATE rol_persona 
-      SET sede_id = $1 
-      WHERE doc_persona = $2
+      SET sede_id = ? 
+      WHERE doc_persona = ?
     `, [sedeId, documento]);
 
     console.log(`✅ Sede actualizada para persona ${documento} por admin ${decoded.id}`);
